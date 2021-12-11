@@ -1,0 +1,6 @@
+/credentials.json
+/gmail_token.json
+/sheets_token.json
+/view
+__pycache__/
+launch.json
