@@ -24,23 +24,23 @@ class Account():
         gmail_service_profile = self.gmail_service.users().getProfile(userId='me').execute()
         assert(gmail_service_profile['emailAddress'] == self.gmail_address)
 
-    @property
-    def last_transaction(self):
+    def retrieve_last_transaction(self):
         # Get the latest expense from db
         with closing(get_user_db(self.username)) as db:
             cursor = db.cursor()
             cursor.execute('SELECT datetime, vendor_id, amount FROM expenses ORDER BY datetime DESC LIMIT 1') # What if there are multiple eligible last rows?
             last_date, last_vendor_id, last_amount = cursor.fetchone() # What if table is empty or D.N.E.?
             last_transaction = Transaction(last_date, last_vendor_id, last_amount)
-            logger.debug('self.last_transaction=%s', last_transaction)
+            logger.debug('Last Transaction: %s', last_transaction)
             return last_transaction
 
     def update_transactions(self, dry_run=True):
-        last_transaction_date_usertz = self.last_transaction.date.astimezone(pytz.timezone(self.timezone))
+        last_transaction = self.retrieve_last_transaction()
+        last_transaction_date_usertz = last_transaction.date.astimezone(pytz.timezone(self.timezone))
         after_date = last_transaction_date_usertz - datetime.timedelta(1) # TODO: remove -1, gmail after: is inclusive
 
         messages = self._get_all_transaction_messages(after_date)
-        transactions = self._process_messages(messages)
+        transactions = self._process_messages(messages, last_transaction)
         self._insert_transactions(transactions, dry_run=dry_run)
 
     def _get_all_transaction_messages(self, after_date=None):
@@ -63,7 +63,7 @@ class Account():
         logger.debug('Retrieved %d transaction messages', len(messages))
         return messages
 
-    def _process_messages(self, messages):
+    def _process_messages(self, messages, last_transaction):
         transactions = list()
         logger.debug('Processing Messages...')
         for message in messages:
@@ -79,8 +79,8 @@ class Account():
                     date = dateutil.parser.parse(date_string).astimezone(pytz.utc)
                     transaction.date = date
                 if transaction.complete:
-                    if transaction != self.last_transaction and transaction.date < self.last_transaction.date: # TODO: Make sure this logic only gets the latest message
-                        logger.debug('Keeping  %s', Transaction)
+                    if transaction != last_transaction and transaction.date < last_transaction.date: # TODO: Make sure this logic only gets the latest message
+                        logger.debug('Keeping  %s', Transaction) # TODO: fix typo
                         transactions.append(transaction)
                     else:
                         logger.debug('Skipping %s', transaction)
