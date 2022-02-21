@@ -2,7 +2,7 @@ import dateutil.parser
 import pytz
 
 class Transaction:
-    def __init__(self, date=None, vendor_id=None, amount=None):
+    def __init__(self, date=None, vendor_id=None, amount=None): #TODO: Store a message id in here
         if isinstance(date, str):
             self.date = dateutil.parser.parse(date).astimezone(pytz.utc)
         else:
